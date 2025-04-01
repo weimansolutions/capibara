@@ -4,8 +4,17 @@
 from fastapi import FastAPI
 from app.api import auth, users, tasks
 from app.db.database import create_db_and_tables
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="WebApp Modular")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # o ["*"] para no restringir,  # o ["http://localhost:5173"] si querés restringir
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.on_event("startup")
 def on_startup():
