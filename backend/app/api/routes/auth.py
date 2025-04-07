@@ -1,31 +1,26 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlmodel import Session
 from app.db.database import get_session
-from app.models.models import Usuario
-from jose import jwt, JWTError
-from passlib.context import CryptContext
-from pydantic import BaseModel
-import os
+from app.models.users import User
+from app.schemas.users import UserCreate
+from app.core import security 
+from app.crud.user import get_user_by_username
+from fastapi.security import OAuth2PasswordRequestForm
+from datetime import datetime, timedelta
 
-SECRET_KEY = os.getenv("SECRET_KEY", "supersecret")
-ALGORITHM = "HS256"
+router = APIRouter(tags=["Auth"])
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+@router.post("/login")
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_session)):
+    user = get_user_by_username(db, form_data.username)
+    print(user)
+    if not user or not security.verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect username or password")
 
-router = APIRouter()
+    if not user.is_active:
+        raise HTTPException(status_code=400, detail="Inactive user")
 
-class Token(BaseModel):
-    access_token: str
-    token_type: str
+    access_token_expires = timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = security.create_access_token(data={"sub": user.username}, expires_delta=access_token_expires)
 
-class LoginInput(BaseModel):
-    email: str
-    password: str
-
-@router.post("/login", response_model=Token)
-def login(data: LoginInput, session: Session = Depends(get_session)):
-    user = session.exec(select(Usuario).where(Usuario.email == data.email)).first()
-    if not user or not pwd_context.verify(data.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    token = jwt.encode({"sub": user.email}, SECRET_KEY, algorithm=ALGORITHM)
-    return {"access_token": token, "token_type": "bearer"}
+    return {"access_token": access_token, "token_type": "bearer"}

@@ -1,35 +1,49 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session
 from app.db.database import get_session
-from app.models.models import Empresa, Usuario
-from passlib.context import CryptContext
-from pydantic import BaseModel
+from app.models.users import User
+from app.schemas.users import UserCreate, UserUpdate, UserOut
+from app.core.security import get_password_hash
+from app.crud.user import get_users, create_user, update_user,get_user,get_users_all
+from app.api.deps.auth import get_current_active_user
 
-router = APIRouter()
+router = APIRouter(prefix="/users", tags=["Users"])
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+@router.get("/listar", status_code=status.HTTP_201_CREATED)
+def list_users(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_active_user)
+    ):
 
-class EmpresaCreate(BaseModel):
-    nombre: str
+    return get_users(session, 1)
 
-class UsuarioCreate(BaseModel):
-    email: str
-    password: str
-    empresa_id: int
+@router.get("/listar_todo", status_code=status.HTTP_201_CREATED)
+def list_users(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_active_user)
+    ):
 
-@router.post("/empresa")
-def crear_empresa(data: EmpresaCreate, session: Session = Depends(get_session)):
-    empresa = Empresa(nombre=data.nombre)
-    session.add(empresa)
-    session.commit()
-    session.refresh(empresa)
-    return empresa
+    return get_users_all(session)
 
-@router.post("/usuario")
-def crear_usuario(data: UsuarioCreate, session: Session = Depends(get_session)):
-    hashed = pwd_context.hash(data.password)
-    user = Usuario(email=data.email, hashed_password=hashed, empresa_id=data.empresa_id)
-    session.add(user)
-    session.commit()
-    session.refresh(user)
-    return user
+@router.post("/create_user", status_code=status.HTTP_201_CREATED)
+def create_user_(
+    user_in: UserCreate, 
+    session: Session = Depends(get_session), 
+    current_user: User = Depends(get_current_active_user)
+    ):
+
+    return create_user(user_in, session)
+
+@router.patch("/update_user/{user_id}", response_model=UserOut)
+def update_user_endpoint(
+    user_id: int,
+    updates: UserUpdate,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_active_user)
+    ):
+
+    db_user = get_user(db, user_id, current_user.company_id)
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    return update_user(db, db_user, updates)
