@@ -8,7 +8,7 @@ from app.crud.user import get_user_by_username
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import datetime, timedelta
 
-router = APIRouter(tags=["Auth"])
+router = APIRouter(tags=["Login"])
 
 @router.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_session)):

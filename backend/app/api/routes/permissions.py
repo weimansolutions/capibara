@@ -3,7 +3,7 @@ from sqlmodel import Session
 from app.db.database import get_session
 from app.models.permissions import Permission
 from app.schemas.permission import PermissionsCreate, PermissionsUpdate
-from app.api.deps.auth import get_current_active_user
+from app.api.deps.auth import require_superadmin
 from app.models.users import User
 
 
@@ -13,7 +13,7 @@ router = APIRouter(prefix="/permission", tags=["Permission"])
 def create_permission(
     permission_in: PermissionsCreate, 
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_active_user)):
+    current_user: User = Depends(require_superadmin)):
 
     permission = Permission(
         name=permission_in.name,
@@ -28,6 +28,6 @@ def create_permission(
 @router.get("/view_permission", status_code=status.HTTP_201_CREATED)
 def get_permission(
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_superadmin)
     ):
     return session.query(Permission).all()
